@@ -19,7 +19,7 @@
             <groupId>aparapi</groupId>
             <artifactId>aparapi</artifactId>
             <version>2011_09_13</version>
-            <scope>compile</scope>
+            <scope>system</scope>
             <systemPath>${project.basedir}/aparapi/aparapi.jar</systemPath>
         </dependency>
     </dependencies>

@@ -34,6 +34,7 @@
     <orderEntry type="library" name="Maven: org.apache.lucene:lucene-analyzers:3.1.0" level="project" />
     <orderEntry type="library" name="Maven: org.apache.mahout.commons:commons-cli:2.0-mahout" level="project" />
     <orderEntry type="library" name="Maven: commons-collections:commons-collections:3.2.1" level="project" />
+    <orderEntry type="library" name="Maven: aparapi:aparapi:2011_09_13" level="project" />
   </component>
 </module>
 
