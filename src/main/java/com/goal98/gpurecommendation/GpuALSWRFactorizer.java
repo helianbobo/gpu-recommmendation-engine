@@ -91,34 +91,34 @@ public class GpuALSWRFactorizer extends ALSWRFactorizer {
 
         log.info("start kernelM...");
         Kernel kernelM = new ALSWRKernel(featuresM, numFeatures);
-//        kernelM.setExecutionMode(Kernel.EXECUTION_MODE.JTP);
+        kernelM.setExecutionMode(Kernel.EXECUTION_MODE.GPU);
         final int numItems = dataModel.getNumItems();
-        kernelM.execute(1024);
+        kernelM.execute(numItems);
         kernelM.dispose();
 
 
 
         log.info("start kernelU...");
         Kernel kernelU = new ALSWRKernel(featuresU, numFeatures);
-//        kernelU.setExecutionMode(Kernel.EXECUTION_MODE.JTP);
+        kernelU.setExecutionMode(Kernel.EXECUTION_MODE.GPU);
         final int numUsers = dataModel.getNumUsers();
-        kernelU.execute(1024);
+        kernelU.execute(numUsers);
         kernelU.dispose();
 
 
         log.info("finished computation of the factorization...");
 
         double[][] M = new double[numItems][numFeatures];
-        double[][] U = new double[numItems][numFeatures];
+        double[][] U = new double[numUsers][numFeatures];
 
         buildMatrix(U, featuresU);
         buildMatrix(M, featuresM);
         return createFactorization(U, M);
     }
 
-    private void buildMatrix(double[][] u, double[] featuresU) {
-        for (int i = 0; i < featuresU.length; i++) {
-            double featureValue = featuresU[i];
+    private void buildMatrix(double[][] u, double[] features) {
+        for (int i = 0; i < features.length; i++) {
+            double featureValue = features[i];
             u[i / numFeatures][i % numFeatures] = featureValue;
 
         }

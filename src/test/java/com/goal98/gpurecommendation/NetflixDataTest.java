@@ -1,10 +1,14 @@
 package com.goal98.gpurecommendation;
 
 
+import org.apache.mahout.cf.taste.common.TasteException;
+import org.apache.mahout.cf.taste.eval.RecommenderBuilder;
 import org.apache.mahout.cf.taste.example.netflix.NetflixDataModel;
+import org.apache.mahout.cf.taste.impl.eval.RMSRecommenderEvaluator;
 import org.apache.mahout.cf.taste.impl.recommender.svd.SVDRecommender;
 import org.apache.mahout.cf.taste.model.DataModel;
 import org.apache.mahout.cf.taste.recommender.RecommendedItem;
+import org.apache.mahout.cf.taste.recommender.Recommender;
 import org.junit.Test;
 
 import java.io.File;
@@ -17,13 +21,16 @@ public class NetflixDataTest {
 
         DataModel dataModel = new NetflixDataModel(new File("E:\\netflix\\download"), true);
 
-        SVDRecommender svdRecommender = new SVDRecommender(dataModel, new GpuALSWRFactorizer(dataModel, 3, 0.1, 1));
-        List<RecommendedItem> recommendedItems = svdRecommender.recommend(1488844, 10);
+        final GpuALSWRFactorizer factorizer = new GpuALSWRFactorizer(dataModel, 3, 0.1, 1);
 
-        for (int i = 0; i < recommendedItems.size(); i++) {
-            RecommendedItem item = recommendedItems.get(i);
-            System.out.println("item = " + item);
-        }
+        RMSRecommenderEvaluator evaluator = new RMSRecommenderEvaluator();
+        evaluator.evaluate(new RecommenderBuilder() {
+            @Override
+            public Recommender buildRecommender(DataModel dataModel) throws TasteException {
+                return new SVDRecommender(dataModel, factorizer);
+            }
+        }, null, dataModel, 0.85, 1.0);
+
 
     }
 
