@@ -70,13 +70,17 @@ public class GpuALSWRFactorizer extends ALSWRFactorizer {
     public Factorization factorize() throws TasteException {
         log.info("starting to compute the factorization...");
         final AlternateLeastSquaresSolver solver = new AlternateLeastSquaresSolver();
+        final Kernel.EXECUTION_MODE executionMode = Kernel.EXECUTION_MODE.GPU;
+
+        final int numItems = dataModel.getNumItems();
+        final int numUsers = dataModel.getNumUsers();
 
         final double[] featuresM;
         final double[] featuresU;
 
         log.info("features initialization ...");
         Random random = RandomUtils.getRandom();
-        featuresM = new double[this.dataModel.getNumItems() * this.numFeatures];
+        featuresM = new double[numItems * this.numFeatures];
         LongPrimitiveIterator itemIDsIterator = this.dataModel.getItemIDs();
         while (itemIDsIterator.hasNext()) {
             long itemID = itemIDsIterator.nextLong();
@@ -86,24 +90,20 @@ public class GpuALSWRFactorizer extends ALSWRFactorizer {
                 featuresM[itemIDIndex * numFeatures + feature] = random.nextDouble() * 0.1;
             }
         }
-        featuresU = new double[this.dataModel.getNumUsers() * this.numFeatures];
+        featuresU = new double[numUsers * this.numFeatures];
 
 
         log.info("start kernelM...");
-        Kernel kernelM = new ALSWRKernel(featuresM, numFeatures);
-        kernelM.setExecutionMode(Kernel.EXECUTION_MODE.GPU);
-        final int numItems = dataModel.getNumItems();
-        kernelM.execute(numItems);
-        kernelM.dispose();
+//        calculateFeatureExplicit(executionMode, numItems, featuresM);
 
+        calculateFeatureExplicit(executionMode, numUsers, featuresU);
 
-
-        log.info("start kernelU...");
+        /*log.info("start kernelU...");
         Kernel kernelU = new ALSWRKernel(featuresU, numFeatures);
-        kernelU.setExecutionMode(Kernel.EXECUTION_MODE.GPU);
-        final int numUsers = dataModel.getNumUsers();
+        kernelU.setExecutionMode(executionMode);
+
         kernelU.execute(numUsers);
-        kernelU.dispose();
+        kernelU.dispose();*/
 
 
         log.info("finished computation of the factorization...");
@@ -114,6 +114,57 @@ public class GpuALSWRFactorizer extends ALSWRFactorizer {
         buildMatrix(U, featuresU);
         buildMatrix(M, featuresM);
         return createFactorization(U, M);
+    }
+
+    private void calculateFeature(Kernel.EXECUTION_MODE executionMode, int num, double[] features) {
+        Kernel kernel = new ALSWRKernel(features, numFeatures);
+        kernel.setExecutionMode(executionMode);
+        kernel.execute(num);
+        kernel.dispose();
+    }
+
+    private void calculateFeatureExplicit(Kernel.EXECUTION_MODE executionMode, int num, final double[] features) {
+
+        final int[] numFeaturesArray = new int[]{numFeatures};
+
+        Kernel kernel = new Kernel() {
+            @Override
+            public void run() {
+                int globalId = getGlobalId();
+                final int index = globalId * numFeaturesArray[0];
+
+                if(index > features.length) return;
+
+                for (int i = 0; i < numFeaturesArray[0]; i++) {
+                    features[index + i] = features[index + i] * 2;
+                }
+
+            }
+        };
+        kernel.setExecutionMode(executionMode);
+        kernel.setExplicit(true);
+
+        kernel.put(features);
+        kernel.put(numFeaturesArray);
+
+        kernel.execute(findExeSize(num));
+
+        kernel.get(features);
+
+        log.error(kernel.getExecutionMode().toString());
+
+        kernel.dispose();
+    }
+
+    private int findExeSize(int num){
+        int result = 0;
+        int i = 1;
+        while (result < num){
+            result = (int)Math.pow(2, i++);
+        }
+
+        return result;
+
     }
 
     private void buildMatrix(double[][] u, double[] features) {
@@ -132,19 +183,6 @@ public class GpuALSWRFactorizer extends ALSWRFactorizer {
         }
         return avg.getAverage();
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     static class Features {
