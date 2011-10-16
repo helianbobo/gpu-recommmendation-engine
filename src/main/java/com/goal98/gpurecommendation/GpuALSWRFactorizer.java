@@ -94,7 +94,7 @@ public class GpuALSWRFactorizer extends ALSWRFactorizer {
 
 
         log.info("start kernelM...");
-//        calculateFeatureExplicit(executionMode, numItems, featuresM);
+        calculateFeatureExplicit(executionMode, numItems, featuresM);
 
         calculateFeatureExplicit(executionMode, numUsers, featuresU);
 
@@ -133,7 +133,7 @@ public class GpuALSWRFactorizer extends ALSWRFactorizer {
                 int globalId = getGlobalId();
                 final int index = globalId * numFeaturesArray[0];
 
-                if(index > features.length) return;
+                if(index + numFeaturesArray[0] > features.length) return;
 
                 for (int i = 0; i < numFeaturesArray[0]; i++) {
                     features[index + i] = features[index + i] * 2;
@@ -151,17 +151,21 @@ public class GpuALSWRFactorizer extends ALSWRFactorizer {
 
         kernel.get(features);
 
-        log.error(kernel.getExecutionMode().toString());
-
         kernel.dispose();
     }
 
     private int findExeSize(int num){
+
+        log.debug("-- findExeSize({})", num);
+
         int result = 0;
-        int i = 1;
+        int i = 10;
         while (result < num){
             result = (int)Math.pow(2, i++);
         }
+
+
+        log.debug("<< findExeSize return {}", result);
 
         return result;
 
