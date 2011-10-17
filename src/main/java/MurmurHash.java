@@ -1,4 +1,5 @@
 import com.amd.aparapi.Kernel;
+import org.apache.mahout.common.RandomUtils;
 
 import java.nio.ByteBuffer;
 
@@ -10,26 +11,24 @@ public class MurmurHash {
 
         final int size = 24;
 
-        murmur((int) Math.pow(2, size), Kernel.EXECUTION_MODE.JTP);
+        hash((int) Math.pow(2, size), Kernel.EXECUTION_MODE.JTP);
 
-        murmur((int) Math.pow(2, size), Kernel.EXECUTION_MODE.GPU);
 
-        /*for(int i = 0; i < 10; i++){
-            murmur((int) Math.pow(2, 24), Kernel.EXECUTION_MODE.GPU);
-        }*/
+        for (int i = 0; i < 3; i++) {
+            hash((int) Math.pow(2, size), Kernel.EXECUTION_MODE.GPU);
+        }
     }
 
-    private static void murmur(int size, Kernel.EXECUTION_MODE mode) {
+
+    private static void hash(int size, Kernel.EXECUTION_MODE mode) {
         System.out.println("\n\nsize = " + size);
 
         int numInt = 1;
         int length = numInt * 4;
         final int[] lengthArray = new int[]{length};
 
-        /** Input float array for which square values need to be computed. */
         final byte[] values = new byte[size * length];
 
-        /** Initialize input array. */
         for (int i = 0; i < size; i++) {
             ByteBuffer buffer = ByteBuffer.allocate(length);
 
@@ -40,12 +39,61 @@ public class MurmurHash {
             byte[] bytes = buffer.array();
 
             System.arraycopy(bytes, 0, values, i * length, length);
-            /*for (int j = 0; j < length; j++) {
-                values[i * length + j] = bytes[j];
-            }*/
+
 
         }
 
+        final long[] squares = new long[size];
+
+        Kernel kernel = new Kernel() {
+
+            public static final int MAX_INT_SMALLER_TWIN_PRIME = 2147482949;
+
+            @Override
+            public void run() {
+                int gid = getGlobalId();
+                squares[gid] = hash(gid, 1,10,100);
+
+            }
+
+            private int hash(int gid, int seedA, int seedB, int seedC) {
+                long hashValue = 31;
+                final int length = lengthArray[0];
+                final int offset = gid * length;
+
+//                final float s = sqrt(100) * asin(10)*tan(30)*sqrt(101) * asin(11)*tan(31);
+
+                for (int i = 0; i < length; i++){
+
+                    long byteVal = values[offset + i];
+                    hashValue *= seedA * (byteVal >> 4);
+                    hashValue += seedB * byteVal + seedC;
+
+                }
+
+                return abs((int) (hashValue % MAX_INT_SMALLER_TWIN_PRIME));
+            }
+        };
+
+        kernel.setExecutionMode(mode);
+        kernel.setExplicit(true);
+        kernel.put(values);
+        kernel.put(lengthArray);
+        kernel.execute(size);
+        kernel.get(squares);
+
+        System.out.println("duration = " + kernel.getExecutionTime());
+        System.out.println("kernel.getConversionTime() = " + kernel.getConversionTime());
+
+        kernel.dispose();
+
+
+//        murmurHash(size, mode, lengthArray, values);
+
+
+    }
+
+    private static void murmurHash(int size, Kernel.EXECUTION_MODE mode, final int[] lengthArray, final byte[] values) {
         /** Output array which will be populated with square values of corresponding input array elements. */
         final long[] squares = new long[size];
 
@@ -118,8 +166,6 @@ public class MurmurHash {
         for (int i = 0; i < 1; ++i) {
             doHash(size, mode, lengthArray, values, squares, seeds, kernel);
         }
-
-
     }
 
     private static void doHash(int size, Kernel.EXECUTION_MODE mode, int[] lengthArray, byte[] values, long[] squares, int[] seeds, Kernel kernel) {
